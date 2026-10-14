@@ -39,11 +39,15 @@ jobs:
       # preset) - android-actions/setup-android@v3 is unmaintained and tries
       # to install the long-removed legacy "tools" package, which always
       # fails. Just accept licenses and install what we need from the SDK
-      # that's already there.
+      # that's already there. cmdline-tools isn't symlinked as "latest" and
+      # isn't on PATH, so resolve the sdkmanager binary by path instead.
       - name: Install SDK packages
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(ls "$SDK_ROOT"/cmdline-tools/*/bin/sdkmanager | head -n1)"
+          echo "Using sdkmanager at: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       # android/ is gitignored and regenerated per machine, so scaffold it here
       # from the Expo managed project (same role as "cap add android").
