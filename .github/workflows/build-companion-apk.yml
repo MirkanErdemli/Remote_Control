@@ -30,16 +30,20 @@ jobs:
         run: npm ci
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # ubuntu-latest already ships a full Android SDK (ANDROID_HOME is
+      # preset) - android-actions/setup-android@v3 is unmaintained and tries
+      # to install the long-removed legacy "tools" package, which always
+      # fails. Just accept licenses and install what we need from the SDK
+      # that's already there.
       - name: Install SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       # android/ is gitignored and regenerated per machine, so scaffold it here
       # from the Expo managed project (same role as "cap add android").
