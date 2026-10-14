@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Video Remote Control",
+    "slug": "video-remote-control-companion",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#111111"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {}
+  }
+}

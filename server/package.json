@@ -1,0 +1,13 @@
+{
+  "name": "video-remote-control-server",
+  "version": "0.1.0",
+  "description": "Local WebSocket relay between the phone companion app and the browser extension.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

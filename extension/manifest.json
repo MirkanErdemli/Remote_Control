@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Video Remote Control",
+  "version": "0.1.0",
+  "description": "Telefonu uzaktan kumanda olarak kullanarak tarayicidaki HTML5 videoyu kontrol et.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["site-adapters/netflix.js", "site-adapters/youtube.js", "content-script.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Video Remote Control"
+  }
+}

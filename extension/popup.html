@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        width: 220px;
+        padding: 12px;
+        margin: 0;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #c62828;
+      }
+      .dot.connected {
+        background: #2e7d32;
+      }
+      p.hint {
+        font-size: 11px;
+        color: #666;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Video Remote Control</h1>
+    <div class="status">
+      <span id="dot" class="dot"></span>
+      <span id="label">Kontrol ediliyor...</span>
+    </div>
+    <p class="hint">Local server'in (server/) calistigindan emin olun.</p>
+    <script src="popup.js"></script>
+  </body>
+</html>
