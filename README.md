@@ -28,8 +28,7 @@ service worker) calistirir; asil WebSocket sunucusu ayri bir Node process
 
 ### 0. On kosul: Node.js
 
-Bu makinede Node.js kurulu degil. Once [nodejs.org](https://nodejs.org) uzerinden
-LTS surumunu kurun (`node -v` ile dogrulayin).
+Node.js LTS kurulu (`node -v`, `npm -v` ile dogrulanabilir).
 
 ### 1. Local server
 
@@ -59,6 +58,24 @@ npx expo start
 
 Expo Go uygulamasi ile QR kodu okutup telefonda acin, server IP'sini girip
 "Baglan" deyin.
+
+### 4. APK olusturma (EAS Build)
+
+APK, Expo'nun bulut build servisi (EAS) ile uretiliyor; lokal Android SDK
+kurulumu gerekmiyor. `app.json` icinde paket adi (`com.mirkan.videoremotecontrol`)
+ve `eas.json` icinde `preview` profili (`buildType: apk`) zaten ayarli.
+
+```bash
+cd companion-app
+npx eas-cli login       # ucretsiz Expo hesabinla giris (interaktif, bunu siz yapmalisiniz)
+npx eas-cli build:configure   # ilk calistirmada projectId olusturur (app.json'a yazar)
+npx eas-cli build -p android --profile preview
+```
+
+Build bulutta tamamlaninca terminalde/expo.dev'de bir indirme linki cikar;
+o linkten `.apk` dosyasini indirip telefona kurabilirsiniz. `eas login`
+interaktif oldugu icin bunu siz calistirmalisiniz — Claude hesap girisini
+sizin yerinize yapamaz.
 
 ## Komut Protokolu
 
