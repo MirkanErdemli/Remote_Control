@@ -59,23 +59,34 @@ npx expo start
 Expo Go uygulamasi ile QR kodu okutup telefonda acin, server IP'sini girip
 "Baglan" deyin.
 
-### 4. APK olusturma (EAS Build)
+### 4. APK olusturma (GitHub Actions — birincil yontem)
 
-APK, Expo'nun bulut build servisi (EAS) ile uretiliyor; lokal Android SDK
-kurulumu gerekmiyor. `app.json` icinde paket adi (`com.mirkan.videoremotecontrol`)
-ve `eas.json` icinde `preview` profili (`buildType: apk`) zaten ayarli.
+Baska bir hesaba ihtiyac yok: APK, bu repo GitHub'a push edildikten sonra
+GitHub'in kendi ucretsiz Actions runner'inda deriliyor (Agamia Bulmaca
+Koleksiyonu projesindeki ayni yontem, Capacitor yerine `expo prebuild` ile).
+
+1. Repo'yu GitHub'a push edin.
+2. GitHub'da repo -> **Actions** sekmesi -> **Build Companion App APK** ->
+   **Run workflow**.
+3. Build bitince ayni run sayfasinin **Artifacts** bolumunden
+   `video-remote-control-companion-debug-apk` dosyasini indirin, icinden
+   cikan `.apk`'yi telefona kurun.
+
+Workflow dosyasi: `.github/workflows/build-companion-apk.yml`. `android/`
+klasoru (Flutter projesindeki gibi) gitignore'da — her calistirmada
+`expo prebuild` ile sifirdan uretiliyor.
+
+### 5. Alternatif: EAS Build (bulut, ucretsiz Expo hesabi gerekir)
+
+`app.json`'da paket adi, `eas.json`'da `preview` profili (`buildType: apk`)
+hazir dursun diye birakildi, ama varsayilan yontem degil. Kullanmak isterseniz:
 
 ```bash
 cd companion-app
 npx eas-cli login       # ucretsiz Expo hesabinla giris (interaktif, bunu siz yapmalisiniz)
-npx eas-cli build:configure   # ilk calistirmada projectId olusturur (app.json'a yazar)
+npx eas-cli build:configure
 npx eas-cli build -p android --profile preview
 ```
-
-Build bulutta tamamlaninca terminalde/expo.dev'de bir indirme linki cikar;
-o linkten `.apk` dosyasini indirip telefona kurabilirsiniz. `eas login`
-interaktif oldugu icin bunu siz calistirmalisiniz — Claude hesap girisini
-sizin yerinize yapamaz.
 
 ## Komut Protokolu
 

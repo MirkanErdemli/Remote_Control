@@ -1,0 +1,60 @@
+name: Build Companion App APK
+
+# Manual trigger only — won't run on every push. Run it from the Actions tab
+# ("Build Companion App APK" -> "Run workflow") and download the APK from the
+# run's Artifacts when it finishes.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: companion-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: companion-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      # android/ is gitignored and regenerated per machine, so scaffold it here
+      # from the Expo managed project (same role as "cap add android").
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Build debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-remote-control-companion-debug-apk
+          path: companion-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
