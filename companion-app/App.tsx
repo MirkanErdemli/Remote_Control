@@ -16,22 +16,47 @@ export default function App() {
   const [serverHost, setServerHost] = useState("192.168.1.100");
   const [status, setStatus] = useState<ConnectionState>("disconnected");
   const [speed, setSpeed] = useState(1);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
+
+  const logDebug = useCallback((msg: string) => {
+    const line = `${new Date().toLocaleTimeString()}  ${msg}`;
+    setDebugLog((prev) => [line, ...prev].slice(0, 8));
+  }, []);
 
   const connect = useCallback(() => {
     socketRef.current?.close();
     setStatus("connecting");
 
-    const socket = new WebSocket(`ws://${serverHost}:8787`);
+    const url = `ws://${serverHost}:8787`;
+    logDebug(`Connecting to ${url}`);
+    const socket = new WebSocket(url);
     socketRef.current = socket;
 
+    const connectStartedAt = Date.now();
+    const timeoutId = setTimeout(() => {
+      if (socketRef.current === socket && status !== "connected") {
+        logDebug("Timeout: 8s'de hicbir event gelmedi (open/close/error yok)");
+      }
+    }, 8000);
+
     socket.onopen = () => {
+      clearTimeout(timeoutId);
       setStatus("connected");
+      logDebug("Acildi (onopen)");
       socket.send(JSON.stringify({ role: "phone", type: "hello" }));
     };
-    socket.onclose = () => setStatus("disconnected");
-    socket.onerror = () => setStatus("disconnected");
-  }, [serverHost]);
+    socket.onclose = (e) => {
+      clearTimeout(timeoutId);
+      setStatus("disconnected");
+      logDebug(`Kapandi (onclose): code=${e.code} reason=${e.reason || "-"} (${Date.now() - connectStartedAt}ms sonra)`);
+    };
+    socket.onerror = (e: any) => {
+      clearTimeout(timeoutId);
+      setStatus("disconnected");
+      logDebug(`Hata (onerror): ${e?.message ?? JSON.stringify(e)}`);
+    };
+  }, [serverHost, logDebug, status]);
 
   useEffect(() => {
     return () => socketRef.current?.close();
@@ -76,6 +101,18 @@ export default function App() {
             ? "Baglaniyor..."
             : "Bagli degil"}
         </Text>
+      </View>
+
+      <View style={styles.debugBox}>
+        {debugLog.length === 0 ? (
+          <Text style={styles.debugText}>Henuz baglanti denemesi yok.</Text>
+        ) : (
+          debugLog.map((line, i) => (
+            <Text key={i} style={styles.debugText}>
+              {line}
+            </Text>
+          ))
+        )}
       </View>
 
       <View style={styles.controls}>
@@ -198,5 +235,17 @@ const styles = StyleSheet.create({
   slider: {
     width: "100%",
     height: 40,
+  },
+  debugBox: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+    gap: 2,
+  },
+  debugText: {
+    color: "#888",
+    fontSize: 11,
+    fontFamily: "monospace",
   },
 });
