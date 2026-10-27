@@ -36,4 +36,11 @@
   window.__vrcToggleSubtitles = function () {
     return clickFirst(SUBTITLES_SELECTORS) || (previousToggleSubtitles ? previousToggleSubtitles() : false);
   };
+
+  const previousSubtitlesOn = window.__vrcSubtitlesOn;
+  window.__vrcSubtitlesOn = function () {
+    const btn = document.querySelector(SUBTITLES_SELECTORS[0]);
+    if (btn) return btn.getAttribute("aria-pressed") === "true";
+    return previousSubtitlesOn ? previousSubtitlesOn() : null;
+  };
 })();

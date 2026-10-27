@@ -1,6 +1,6 @@
 // Background service worker (MV3).
 // Connects to the local relay server as a WebSocket client and forwards
-// commands to the content script running in the active tab.
+// commands to the content script running in the tab the remote controls.
 //
 // NOTE: MV3 service workers are not persistent - the OS/browser can kill them
 // after ~30s of inactivity. The socket keeps the worker alive while open, but
@@ -13,6 +13,13 @@ const RECONNECT_ALARM = "vrc-reconnect";
 
 let socket = null;
 let connected = false;
+
+// The tab the remote controls. Set the first time a tab reports a <video>
+// while it's the focused tab, then kept sticky even if the user switches to
+// another tab afterward - otherwise the remote would silently follow
+// whatever tab happens to be focused, which is what broke control on tab
+// switch and made the page seem unresponsive until clicked.
+let targetTabId = null;
 
 function setBadge(text, color) {
   chrome.action.setBadgeText({ text });
@@ -40,7 +47,7 @@ function ensureConnection() {
       console.warn("[VRC] Invalid message from server:", event.data);
       return;
     }
-    await forwardCommandToActiveTab(msg);
+    await forwardCommandToTargetTab(msg);
   });
 
   socket.addEventListener("close", () => {
@@ -54,16 +61,33 @@ function ensureConnection() {
   });
 }
 
-async function forwardCommandToActiveTab(command) {
+async function pickTargetTab() {
+  if (targetTabId != null) {
+    try {
+      const tab = await chrome.tabs.get(targetTabId);
+      if (tab) return tab.id;
+    } catch {
+      targetTabId = null;
+    }
+  }
   const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!activeTab || !activeTab.id) return;
+  return activeTab?.id ?? null;
+}
+
+async function forwardCommandToTargetTab(command) {
+  const tabId = await pickTargetTab();
+  if (tabId == null) return;
 
   try {
-    await chrome.tabs.sendMessage(activeTab.id, { source: "vrc-background", command });
+    await chrome.tabs.sendMessage(tabId, { source: "vrc-background", command });
   } catch (err) {
     console.warn("[VRC] Could not deliver command to tab (no content script?)", err);
   }
 }
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === targetTabId) targetTabId = null;
+});
 
 // Kick off on install/startup, and periodically check via alarm in case the
 // service worker was suspended and the socket silently dropped.
@@ -74,10 +98,29 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === RECONNECT_ALARM) ensureConnection();
 });
 
-// Let the popup query connection status.
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Let the popup query connection status; relay status reports from content
+// scripts up to the server so the phone app can display them, and use them
+// to pick/confirm which tab is the controlled one.
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "vrc-get-status") {
     sendResponse({ connected });
+    return;
+  }
+
+  if (msg?.source === "vrc-content" && sender?.tab?.id != null) {
+    const tabId = sender.tab.id;
+    if (msg.hasVideo) {
+      if (targetTabId == null) {
+        targetTabId = tabId;
+      } else {
+        chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([activeTab]) => {
+          if (activeTab && activeTab.id === tabId) targetTabId = tabId;
+        });
+      }
+    }
+    if (msg.status && tabId === targetTabId && socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "status", ...msg.status }));
+    }
   }
 });
 

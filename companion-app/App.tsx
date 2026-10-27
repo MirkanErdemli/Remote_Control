@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { StatusBar } from "expo-status-bar";
-import { useZeroconf } from "react-native-zeroconf";
+import Zeroconf, { useZeroconf } from "react-native-zeroconf";
 
 type ConnectionState = "disconnected" | "connecting" | "connected";
 
@@ -19,6 +20,8 @@ export default function App() {
   const [status, setStatus] = useState<ConnectionState>("disconnected");
   const [connectedName, setConnectedName] = useState<string | null>(null);
   const [speed, setSpeed] = useState(1);
+  const [volume, setVolume] = useState(1); // 0..2, where 1 = 100%
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -26,6 +29,15 @@ export default function App() {
   // doesn't have to type an IP - manual entry below still works as a
   // fallback when mDNS is blocked on a network.
   const { services, isScanning, restart } = useZeroconf({ type: "vrc", protocol: "tcp" });
+
+  // Android 13+ gates mDNS/NSD resolution behind a local-network permission
+  // prompt; without asking for it up front the scan above can silently find
+  // nothing. This asks once on mount (no-op on platforms/versions that don't
+  // need it).
+  useEffect(() => {
+    const z = new Zeroconf();
+    z.checkLocalNetworkAccess({ type: "vrc", protocol: "tcp" }).catch(() => {});
+  }, []);
 
   const logDebug = useCallback((msg: string) => {
     const line = `${new Date().toLocaleTimeString()}  ${msg}`;
@@ -57,6 +69,17 @@ export default function App() {
         logDebug("Acildi (onopen)");
         socket.send(JSON.stringify({ role: "phone", type: "hello" }));
       };
+      socket.onmessage = (e) => {
+        let msg: any;
+        try {
+          msg = JSON.parse(e.data);
+        } catch {
+          return;
+        }
+        if (msg?.type !== "status") return;
+        if (typeof msg.volume === "number") setVolume(msg.volume);
+        if (typeof msg.speed === "number") setSpeed(msg.speed);
+      };
       socket.onclose = (e) => {
         clearTimeout(timeoutId);
         setStatus("disconnected");
@@ -82,16 +105,11 @@ export default function App() {
     }
   }, []);
 
-  // The video restarts at 1x on the new video, so reflect that here too -
-  // otherwise the displayed speed goes stale after switching videos.
-  const goNext = useCallback(() => {
-    send({ cmd: "next" });
-    setSpeed(1);
-  }, [send]);
-  const goPrev = useCallback(() => {
-    send({ cmd: "prev" });
-    setSpeed(1);
-  }, [send]);
+  // Speed/volume shown on screen now come from the extension's status
+  // reports (see socket.onmessage above), so they self-correct a couple
+  // seconds after switching videos - no need to guess here.
+  const goNext = useCallback(() => send({ cmd: "next" }), [send]);
+  const goPrev = useCallback(() => send({ cmd: "prev" }), [send]);
 
   const dotColor =
     status === "connected" ? "#2e7d32" : status === "connecting" ? "#f9a825" : "#c62828";
@@ -100,7 +118,12 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Video Remote Control</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Video Remote Control</Text>
+          <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsOpen(true)}>
+            <Text style={styles.settingsIcon}>⚙</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>
@@ -204,11 +227,28 @@ export default function App() {
             thumbTintColor="#2e7d32"
           />
 
+          <Text style={styles.label}>
+            Ses: {Math.round(volume * 100)}%{volume > 1 ? " (guclendirilmis)" : ""}
+          </Text>
           <View style={styles.seekRow}>
-            <TouchableOpacity style={styles.seekButton} onPress={() => send({ cmd: "volume", delta: -0.1 })}>
+            <TouchableOpacity
+              style={styles.seekButton}
+              onPress={() => {
+                const next = Math.max(0, volume - 0.1);
+                setVolume(next);
+                send({ cmd: "volume", delta: -0.1 });
+              }}
+            >
               <Text style={styles.buttonText}>Ses -</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.seekButton} onPress={() => send({ cmd: "volume", delta: 0.1 })}>
+            <TouchableOpacity
+              style={styles.seekButton}
+              onPress={() => {
+                const next = Math.min(2, volume + 0.1);
+                setVolume(next);
+                send({ cmd: "volume", delta: 0.1 });
+              }}
+            >
               <Text style={styles.buttonText}>Ses +</Text>
             </TouchableOpacity>
           </View>
@@ -227,6 +267,22 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={settingsOpen} animationType="slide" transparent onRequestClose={() => setSettingsOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Ayarlar</Text>
+              <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsOpen(false)}>
+                <Text style={styles.settingsIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.hintText}>
+              Yakinda: ses tekerlegi, tema, kontrol duzeni ve diger tercihler burada olacak.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -244,7 +300,36 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 20,
     fontWeight: "600",
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
+  },
+  settingsButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#222",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsIcon: {
+    color: "#ccc",
+    fontSize: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#1a1a1a",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   sectionHeaderRow: {
     flexDirection: "row",

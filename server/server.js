@@ -66,6 +66,15 @@ wss.on("connection", (socket) => {
           other.socket.send(JSON.stringify(msg));
         }
       }
+      return;
+    }
+
+    if (msg.type === "status") {
+      for (const other of clients) {
+        if (other !== client && other.role === "phone" && other.socket.readyState === other.socket.OPEN) {
+          other.socket.send(JSON.stringify(msg));
+        }
+      }
     }
   });
 
