@@ -3,7 +3,7 @@
   "name": "Video Remote Control",
   "version": "0.1.0",
   "description": "Telefonu uzaktan kumanda olarak kullanarak tarayicidaki HTML5 videoyu kontrol et.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
