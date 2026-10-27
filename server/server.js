@@ -11,9 +11,21 @@
 
 const os = require("os");
 const { WebSocketServer } = require("ws");
+const { Bonjour } = require("bonjour-service");
 
 const PORT = 8787;
+const DEVICE_NAME = process.env.VRC_DEVICE_NAME || os.hostname();
 const wss = new WebSocketServer({ port: PORT });
+
+// Advertise this server on the LAN via mDNS so the phone app can find it by
+// name instead of the user having to type an IP. Service type "vrc" becomes
+// "_vrc._tcp.local." on the wire.
+const bonjour = new Bonjour();
+const bonjourService = bonjour.publish({
+  name: DEVICE_NAME,
+  type: "vrc",
+  port: PORT,
+});
 
 const clients = new Set();
 
@@ -64,6 +76,7 @@ wss.on("connection", (socket) => {
 });
 
 console.log(`[server] listening on port ${PORT}`);
+console.log(`[server] advertising on the network as "${DEVICE_NAME}" (_vrc._tcp)`);
 const addrs = lanAddresses();
 if (addrs.length > 0) {
   console.log("[server] reachable at:");
@@ -71,3 +84,10 @@ if (addrs.length > 0) {
 } else {
   console.log("[server] no LAN IPv4 address found - phone must be on the same network as this machine.");
 }
+
+process.on("SIGINT", () => {
+  bonjour.unpublishAll(() => {
+    bonjour.destroy();
+    process.exit(0);
+  });
+});
