@@ -11,7 +11,7 @@ function getActiveVideo() {
     .sort((a, b) => b.offsetWidth * b.offsetHeight - a.offsetWidth * a.offsetHeight)[0] || videos[0];
 }
 
-function toggleSubtitles(video) {
+function toggleSubtitlesFallback(video) {
   const tracks = video.textTracks;
   if (!tracks || tracks.length === 0) {
     console.warn("[VRC] No native textTracks on this <video> (custom player, best-effort only).");
@@ -26,12 +26,21 @@ function toggleSubtitles(video) {
 function handleCommand(command) {
   const video = getActiveVideo();
 
-  // "next" doesn't need a <video> reference - it's a DOM click on a
-  // site-specific button, handled by a site adapter if one matched.
+  // These don't need a <video> reference - they're DOM clicks on
+  // site-specific buttons, handled by a site adapter if one matched.
   if (command.cmd === "next") {
     if (window.__vrcNextVideo && window.__vrcNextVideo()) return;
     console.warn("[VRC] No next-video adapter matched this site.");
     return;
+  }
+  if (command.cmd === "prev") {
+    if (window.__vrcPrevVideo && window.__vrcPrevVideo()) return;
+    console.warn("[VRC] No previous-video adapter matched this site.");
+    return;
+  }
+  if (command.cmd === "toggleSubtitles" && window.__vrcToggleSubtitles) {
+    if (window.__vrcToggleSubtitles()) return;
+    // fall through to the generic textTracks-based fallback below
   }
 
   if (!video) {
@@ -54,8 +63,13 @@ function handleCommand(command) {
         video.currentTime = Math.max(0, video.currentTime + command.seconds);
       }
       break;
+    case "volume":
+      if (typeof command.delta === "number") {
+        video.volume = Math.min(1, Math.max(0, video.volume + command.delta));
+      }
+      break;
     case "toggleSubtitles":
-      toggleSubtitles(video);
+      toggleSubtitlesFallback(video);
       break;
     default:
       console.warn("[VRC] Unknown command:", command);
